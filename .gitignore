@@ -1,0 +1,12 @@
+# build files
+*.o
+*.elf
+*.img
+
+# edk2 build
+Build/
+Conf/
+
+# temp
+*.log
+*.tmp
