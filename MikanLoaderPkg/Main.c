@@ -198,7 +198,7 @@ EFI_STATUS EFIAPI UefiMain(
     Halt();
   }
 
-  EFI_FILE_PROTOCOL* memmap_file;
+  EFIF_FILE_PROTOCOL* memmap_file;
   status = root_dir->Open(
       root_dir, &memmap_file, L"\\memmap",
       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
@@ -296,9 +296,6 @@ EFI_STATUS EFIAPI UefiMain(
   // #@@range_end(exit_bs)
 
   UINT64 entry_addr = *(UINT64*)(kernel_base_addr + 24);
-
-  // #@@range_begin(pass_frame_buffer_config)
-  
 
   typedef void EntryPointType(UINT64, UINT64);
   EntryPointType* entry_point = (EntryPointType*)entry_addr;
