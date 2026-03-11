@@ -9,6 +9,7 @@
 #include  <Protocol/BlockIo.h>
 #include  <Guid/FileInfo.h>
 
+//メモリマップ
 struct MemoryMap {
   UINTN buffer_size;
   VOID* buffer;
@@ -18,6 +19,7 @@ struct MemoryMap {
   UINT32 descriptor_version;
 };
 
+//メモリマップの取得
 EFI_STATUS GetMemoryMap(struct MemoryMap* map) {
   if (map->buffer == NULL) {
     return EFI_BUFFER_TOO_SMALL;
@@ -32,6 +34,7 @@ EFI_STATUS GetMemoryMap(struct MemoryMap* map) {
       &map->descriptor_version);
 }
 
+//メモリタイプを名前で対応付け
 const CHAR16* GetMemoryTypeUnicode(EFI_MEMORY_TYPE type) {
   switch (type) {
     case EfiReservedMemoryType: return L"EfiReservedMemoryType";
@@ -54,6 +57,7 @@ const CHAR16* GetMemoryTypeUnicode(EFI_MEMORY_TYPE type) {
   }
 }
 
+//メモリマップをCSV形式で保存
 EFI_STATUS SaveMemoryMap(struct MemoryMap* map, EFI_FILE_PROTOCOL* file) {
   EFI_STATUS status;
   CHAR8 buf[256];
@@ -91,6 +95,7 @@ EFI_STATUS SaveMemoryMap(struct MemoryMap* map, EFI_FILE_PROTOCOL* file) {
   return EFI_SUCCESS;
 }
 
+//USBのルートディレクトリを開く
 EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL** root) {
   EFI_STATUS status;
   EFI_LOADED_IMAGE_PROTOCOL* loaded_image;
@@ -121,6 +126,7 @@ EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL** root) {
   return fs->OpenVolume(fs, root);
 }
 
+//gop(画面描画用インタフェース)を開く
 EFI_STATUS OpenGOP(EFI_HANDLE image_handle,
                    EFI_GRAPHICS_OUTPUT_PROTOCOL** gop) {
   EFI_STATUS status;
@@ -153,6 +159,7 @@ EFI_STATUS OpenGOP(EFI_HANDLE image_handle,
   return EFI_SUCCESS;
 }
 
+//GOP のピクセル形式を文字列に変換
 const CHAR16* GetPixelFormatUnicode(EFI_GRAPHICS_PIXEL_FORMAT fmt) {
   switch (fmt) {
     case PixelRedGreenBlueReserved8BitPerColor:
@@ -170,19 +177,23 @@ const CHAR16* GetPixelFormatUnicode(EFI_GRAPHICS_PIXEL_FORMAT fmt) {
   }
 }
 
+//CPUを永久停止(無限ループ)させる関数
 // #@@range_begin(halt)
 void Halt(void) {
   while (1) __asm__("hlt");
 }
 // #@@range_end(halt)
 
+//メイン関数
 EFI_STATUS EFIAPI UefiMain(
     EFI_HANDLE image_handle,
     EFI_SYSTEM_TABLE* system_table) {
   EFI_STATUS status;
 
+  //コンソール出力
   Print(L"Hello, Mikan World!\n");
 
+  //メモリマップ取得
   CHAR8 memmap_buf[4096 * 4];
   struct MemoryMap memmap = {sizeof(memmap_buf), memmap_buf, 0, 0, 0, 0};
   status = GetMemoryMap(&memmap);
@@ -191,6 +202,7 @@ EFI_STATUS EFIAPI UefiMain(
     Halt();
   }
 
+  //ルートディレクトリを開く
   EFI_FILE_PROTOCOL* root_dir;
   status = OpenRootDir(image_handle, &root_dir);
   if (EFI_ERROR(status)) {
@@ -198,7 +210,8 @@ EFI_STATUS EFIAPI UefiMain(
     Halt();
   }
 
-  EFIF_FILE_PROTOCOL* memmap_file;
+  //メモリマップを保存
+  EFI_FILE_PROTOCOL* memmap_file;
   status = root_dir->Open(
       root_dir, &memmap_file, L"\\memmap",
       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
@@ -218,6 +231,7 @@ EFI_STATUS EFIAPI UefiMain(
     }
   }
 
+  //gop(描画用インタフェース)取得
   EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
   status = OpenGOP(image_handle, &gop);
   if (EFI_ERROR(status)) {
@@ -225,6 +239,7 @@ EFI_STATUS EFIAPI UefiMain(
     Halt();
   }
 
+  //現在の画面モードの情報を表示
   Print(L"Resolution: %ux%u, Pixel Format: %s, %u pixels/line\n",
       gop->Mode->Info->HorizontalResolution,
       gop->Mode->Info->VerticalResolution,
@@ -234,12 +249,14 @@ EFI_STATUS EFIAPI UefiMain(
       gop->Mode->FrameBufferBase,
       gop->Mode->FrameBufferBase + gop->Mode->FrameBufferSize,
       gop->Mode->FrameBufferSize);
-
+  
+  //フレームバッファを白で塗る
   UINT8* frame_buffer = (UINT8*)gop->Mode->FrameBufferBase;
   for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) {
     frame_buffer[i] = 255;
   }
 
+  //kernel.elf を開く
   EFI_FILE_PROTOCOL* kernel_file;
   status = root_dir->Open(
       root_dir, &kernel_file, L"\\kernel.elf",
@@ -249,6 +266,7 @@ EFI_STATUS EFIAPI UefiMain(
     Halt();
   }
 
+  //ファイル情報を取得
   UINTN file_info_size = sizeof(EFI_FILE_INFO) + sizeof(CHAR16) * 12;
   UINT8 file_info_buffer[file_info_size];
   status = kernel_file->GetInfo(
@@ -262,6 +280,7 @@ EFI_STATUS EFIAPI UefiMain(
   EFI_FILE_INFO* file_info = (EFI_FILE_INFO*)file_info_buffer;
   UINTN kernel_file_size = file_info->FileSize;
 
+  //カーネル用メモリを確保
   // #@@range_begin(alloc_error)
   EFI_PHYSICAL_ADDRESS kernel_base_addr = 0x100000;
   status = gBS->AllocatePages(
@@ -272,6 +291,8 @@ EFI_STATUS EFIAPI UefiMain(
     Halt();
   }
   // #@@range_end(alloc_error)
+
+  //カーネルをメモリに読み込む
   status = kernel_file->Read(kernel_file, &kernel_file_size, (VOID*)kernel_base_addr);
   if (EFI_ERROR(status)) {
     Print(L"error: %r", status);
@@ -279,6 +300,7 @@ EFI_STATUS EFIAPI UefiMain(
   }
   Print(L"Kernel: 0x%0lx (%lu bytes)\n", kernel_base_addr, kernel_file_size);
 
+  //Boot終了
   // #@@range_begin(exit_bs)
   status = gBS->ExitBootServices(image_handle, memmap.map_key);
   if (EFI_ERROR(status)) {
@@ -296,7 +318,7 @@ EFI_STATUS EFIAPI UefiMain(
   // #@@range_end(exit_bs)
 
   UINT64 entry_addr = *(UINT64*)(kernel_base_addr + 24);
-
+  //カーネルを実行
   typedef void EntryPointType(UINT64, UINT64);
   EntryPointType* entry_point = (EntryPointType*)entry_addr;
   entry_point(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
