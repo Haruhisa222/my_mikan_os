@@ -8,6 +8,7 @@
 #include  <Protocol/DiskIo2.h>
 #include  <Protocol/BlockIo.h>
 #include  <Guid/FileInfo.h>
+#include  "frame_buffer_config.hpp"
 
 //メモリマップ
 struct MemoryMap {
@@ -281,7 +282,6 @@ EFI_STATUS EFIAPI UefiMain(
   UINTN kernel_file_size = file_info->FileSize;
 
   //カーネル用メモリを確保
-  // #@@range_begin(alloc_error)
   EFI_PHYSICAL_ADDRESS kernel_base_addr = 0x100000;
   status = gBS->AllocatePages(
       AllocateAddress, EfiLoaderData,
@@ -290,7 +290,6 @@ EFI_STATUS EFIAPI UefiMain(
     Print(L"failed to allocate pages: %r", status);
     Halt();
   }
-  // #@@range_end(alloc_error)
 
   //カーネルをメモリに読み込む
   status = kernel_file->Read(kernel_file, &kernel_file_size, (VOID*)kernel_base_addr);
@@ -301,7 +300,6 @@ EFI_STATUS EFIAPI UefiMain(
   Print(L"Kernel: 0x%0lx (%lu bytes)\n", kernel_base_addr, kernel_file_size);
 
   //Boot終了
-  // #@@range_begin(exit_bs)
   status = gBS->ExitBootServices(image_handle, memmap.map_key);
   if (EFI_ERROR(status)) {
     status = GetMemoryMap(&memmap);
@@ -315,14 +313,38 @@ EFI_STATUS EFIAPI UefiMain(
       Halt();
     }
   }
-  // #@@range_end(exit_bs)
 
   UINT64 entry_addr = *(UINT64*)(kernel_base_addr + 24);
-  //カーネルを実行
+
+  //フレームバッファの情報をまとめる
+  struct FrameBufferConfig config = {
+    (UINT8*)gop->Mode->FrameBufferBase,
+    gop->Mode->Info->PixelsPerScanLine,
+    gop->Mode->Info->HorizontalResolution,
+    gop->Mode->Info->VerticalResolution,
+    0
+  };
+  switch (gop->Mode->Info->PixelFormat) {
+    case PixelRedGreenBlueReserved8BitPerColor:
+      config.pixel_format = kPixelRGBResv8BitPerColor;
+      break;
+    case PixelBlueGreenRedReserved8BitPerColor:
+      config.pixel_format = kPixelBGRResv8BitPerColor;
+      break;
+    default:
+      Print(L"Unsupported pixel format: %d\n", gop->Mode->Info->PixelFormat);
+      Halt();
+  }
+
+  /*
   typedef void EntryPointType(UINT64, UINT64);
   EntryPointType* entry_point = (EntryPointType*)entry_addr;
   entry_point(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
-
+  */
+  //カーネルのエントリポイント(main関数)を呼び出す
+  typedef void EntryPointType(const struct FrameBufferConfig*);
+  EntryPointType* entry_point = (EntryPointType*)entry_addr;
+  entry_point(&config);
   Print(L"All done\n");
 
   while (1);
