@@ -1,5 +1,5 @@
-#include <cstdint>
-#include <cstddef>
+#include <stdint.h>
+#include <stddef.h>
 
 #include "frame_buffer_config.hpp"
 
