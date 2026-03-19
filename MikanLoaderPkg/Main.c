@@ -334,11 +334,6 @@ EFI_STATUS EFIAPI UefiMain(
       Halt();
   }
 
-  /*
-  typedef void EntryPointType(UINT64, UINT64);
-  EntryPointType* entry_point = (EntryPointType*)entry_addr;
-  entry_point(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
-  */
   //カーネルのエントリポイント(main関数)を呼び出す
   typedef void EntryPointType(const struct FrameBufferConfig*);
   EntryPointType* entry_point = (EntryPointType*)entry_addr;

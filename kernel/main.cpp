@@ -30,14 +30,6 @@ int WritePixel(const FrameBufferConfig& config, int x, int y, const pixelColor& 
 }
 
 //WritePixelを使って画面描画
-/*
-extern "C" void KernelMain(uint64_t frame_buffer_base,
-                           uint64_t frame_buffer_size) {
-  uint8_t* frame_buffer = reinterpret_cast<uint8_t*>(frame_buffer_base);
-  for (uint64_t i = 0; i < frame_buffer_size; ++i) {
-    frame_buffer[i] = i % 256;
-  }
-*/
 extern "C" void KernelMain(const FrameBufferConfig& frame_buffer_config) {
   for (int x = 0; x < frame_buffer_config.horizontal_resolution; ++x) {
     for (int y = 0; y < frame_buffer_config.vertical_resolution; ++y) {
