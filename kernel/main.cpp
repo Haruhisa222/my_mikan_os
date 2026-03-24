@@ -7,22 +7,48 @@ struct pixelColor {
   uint8_t r, g, b;
 };
 
-//ピクセル描画用のインタフェース
+//ピクセル描画用のインタフェース(親クラス)
 class PixelWriter{
  public:
   PixelWriter(const FrameBufferConfig& config) : config_{config} {
   }
   virtual ~PixelWriter() = default;
-  virtual void Write(int x, int y, const pixelColor& c) = 0
+  virtual void Write(int x, int y, const pixelColor& c) = 0;
 
-  protected:
-   uint8_t* PixelAt(int x, int y) {
-    return config_.frame_buffer + 4 * (config_.pixels_per_scan_line * y + x);
+ protected:
+  uint8_t* PixelAt(int x, int y) {
+   return config_.frame_buffer + 4 * (config_.pixels_per_scan_line * y + x);
   }
 
   private:
    const FrameBufferConfig& config_;
 };
+
+//RGB形式のピクセル描画クラス
+class RGBResv8BitPerColorPixelWriter : public PixelWriter {
+ public:
+  using PixelWriter::PixelWriter;
+
+  virtual void Write(int x, int y, const pixelColor& c) override {
+    auto p = PixelAt(x, y);
+    p[0] = c.r;
+    p[1] = c.g;
+    p[2] = c.b;
+  }
+}
+
+//BGR形式のピクセル描画クラス
+class BGRResv8BitPerColorPixelWriter : public PixelWriter {
+ public:
+  using PixelWriter::PixelWriter;
+  
+  virtual void Write(int x, int y, const pixelColor& c) override {
+    auto p = PixelAt(x, y);
+    p[0] = c.b;
+    p[1] = c.g;
+    p[2] = c.r;
+  }
+}
 
 
 
